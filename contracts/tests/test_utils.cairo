@@ -119,6 +119,8 @@ pub fn default_create_predictions(prediction_hub: IPredictionHubDispatcher) -> u
 
     let mut spy = spy_events();
 
+    let prediction_count_before = prediction_hub.get_all_predictions_by_market_category(0).len();
+
     prediction_hub
         .create_predictions(
             title.clone(),
@@ -140,8 +142,8 @@ pub fn default_create_predictions(prediction_hub: IPredictionHubDispatcher) -> u
         Option::None => panic!("No MarketCreated event emitted"),
     };
 
-    let all_normal_predictions = prediction_hub.get_all_predictions_by_market_category(0);
-    assert(all_normal_predictions.len() == 1, 'should be increased by 1');
+    let prediction_count_after = prediction_hub.get_all_predictions_by_market_category(0).len();
+    assert(prediction_count_after == prediction_count_before + 1, 'should be increased by 1');
 
     let market = prediction_hub.get_prediction(market_id);
     assert(market.market_id == market_id, 'Market ID mismatch');

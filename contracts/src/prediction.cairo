@@ -1310,7 +1310,24 @@ pub mod PredictionHub {
             market_ids: Array<u256>,
             market_types: Array<u8>,
             winning_choices: Array<u8>,
-        ) {}
+        ) {
+            self.assert_only_admin();
+
+            assert(market_ids.len() == market_types.len(), 'Arrays length mismatch');
+            assert(market_ids.len() == winning_choices.len(), 'Arrays length mismatch');
+
+            let mut i = 0;
+
+            while i != market_ids.len() {
+                let market_id = *market_ids.at(i);
+                let market_type = *market_types.at(i);
+                let winning_choice = *winning_choices.at(i);
+
+                self.emergency_resolve_market(market_id, market_type, winning_choice);
+
+                i += 1;
+            };
+        }
 
 
         fn set_protocol_token(ref self: ContractState, token_address: ContractAddress) {
