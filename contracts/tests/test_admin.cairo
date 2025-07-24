@@ -390,3 +390,109 @@ fn test_emergency_close_market_preserves_other_properties() {
     
     stop_cheat_caller_address(contract.contract_address);
 }
+
+// ================ Emergency Close Multiple Markets Tests ================
+
+#[test]
+#[should_panic(expected: 'Only admin allowed')]
+fn test_non_admin_emergency_close_multiple_markets_should_panic() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, USER1_ADDR());
+    
+    let market_ids = array![1, 2];
+    let market_types = array![0, 0];
+    
+    admin_interface.emergency_close_multiple_markets(market_ids, market_types);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Arrays length mismatch')]
+fn test_emergency_close_multiple_markets_arrays_length_mismatch_should_panic() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    
+    let market_ids = array![1, 2];
+    let market_types = array![0]; // Different length
+    
+    admin_interface.emergency_close_multiple_markets(market_ids, market_types);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Market does not exist')]
+fn test_emergency_close_multiple_markets_market_does_not_exist_should_panic() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    
+    let market_ids = array![999, 1000]; // Non-existent markets
+    let market_types = array![0, 0];
+    
+    admin_interface.emergency_close_multiple_markets(market_ids, market_types);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Market already closed')]
+fn test_emergency_close_multiple_markets_market_already_closed_should_panic() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    
+    let market_id1 = default_create_predictions(contract);
+    let market_id2 = default_create_predictions(contract);
+    
+    // Close the first market first
+    admin_interface.emergency_close_market(market_id1, 0);
+    
+    let market_ids = array![market_id1, market_id2]; // First market already closed
+    let market_types = array![0, 0];
+    
+    admin_interface.emergency_close_multiple_markets(market_ids, market_types);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+fn test_emergency_close_multiple_markets_success() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+
+    // Create multiple markets
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    
+    start_cheat_block_timestamp(contract.contract_address, get_block_timestamp() + 1);
+    let market_id1 = default_create_predictions(contract);
+    start_cheat_block_timestamp(contract.contract_address, get_block_timestamp() + 2);
+    let market_id2 = default_create_predictions(contract);
+    start_cheat_block_timestamp(contract.contract_address, get_block_timestamp() + 3);
+    let market_id3 = default_create_predictions(contract);
+    
+    let market_ids = array![market_id1, market_id2, market_id3];
+    let market_types = array![0, 0, 0];
+
+    // Close all markets at once
+    admin_interface.emergency_close_multiple_markets(market_ids, market_types);
+    stop_cheat_caller_address(contract.contract_address);
+    
+    // Verify all markets are now closed
+    let market1_after = contract.get_prediction(market_id1);
+    let market2_after = contract.get_prediction(market_id2);
+    let market3_after = contract.get_prediction(market_id3);
+    
+    assert!(!market1_after.is_open, "Market 1 should be closed");
+    assert!(!market2_after.is_open, "Market 2 should be closed");
+    assert!(!market3_after.is_open, "Market 3 should be closed");
+}
+
+#[test]
+fn test_emergency_close_multiple_markets_empty_arrays_success() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    
+    let market_ids = array![];
+    let market_types = array![];
+    
+    // Should succeed with empty arrays
+    admin_interface.emergency_close_multiple_markets(market_ids, market_types);
+    
+    stop_cheat_caller_address(contract.contract_address);
+}
+
