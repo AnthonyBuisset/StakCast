@@ -96,6 +96,10 @@ pub trait IAdditionalAdmin<TContractState> {
     );
 
     /// Emergency function to resolve a specific market (admin only)
+    fn emergency_resolve_market(ref self: TContractState, market_id: u256, winning_choice: u8);
+
+    /// Emergency function to force close a market with a reason (admin only)
+    fn force_close_market(ref self: TContractState, market_id: u256, reason: ByteArray);
 
     /// Batch function to resolve multiple markets (admin only)
     fn emergency_resolve_multiple_markets(
