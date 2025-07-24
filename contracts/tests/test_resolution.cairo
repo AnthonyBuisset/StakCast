@@ -140,7 +140,7 @@ fn test_resolve_invalid_market_should_panic() {
 
 
 #[test]
-#[should_panic(expected: ('Invalid choice selected',))]
+#[should_panic(expected: ('Invalid choice',))]
 fn test_resolve_invalid_choice_should_panic() {
     let (market_id, contract, _admin_interface) = create_and_stake_on_general_prediction_util();
 
