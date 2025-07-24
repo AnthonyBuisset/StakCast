@@ -1289,7 +1289,80 @@ pub mod PredictionHub {
         }
 
 
-        fn emergency_close_market(ref self: ContractState, market_id: u256, market_type: u8) {}
+        fn emergency_close_market(ref self: ContractState, market_id: u256, market_type: u8) {
+            self.assert_only_admin();
+            self.assert_market_exists(market_id);
+
+            self.start_reentrancy_guard();
+
+            let mut market = self.all_predictions.entry(market_id).read();
+
+            assert(market.is_open, 'Market already closed');
+            assert(!market.is_resolved, 'Market already resolved');
+
+            market.is_open = false;
+            market.status = MarketStatus::Locked;
+
+            self.all_predictions.entry(market_id).write(market);
+
+            self
+                .emit(
+                    EmergencyPaused {
+                        paused_by: get_caller_address(), reason: "Emergency market closure",
+                    },
+                );
+
+            self.end_reentrancy_guard();
+        }
+
+
+        fn emergency_resolve_market(ref self: ContractState, market_id: u256, winning_choice: u8) {
+            self.assert_only_admin();
+            self.assert_market_exists(market_id);
+            self.assert_valid_choice(winning_choice);
+
+            self.start_reentrancy_guard();
+
+            let mut market = self.all_predictions.entry(market_id).read();
+
+            assert(!market.is_resolved, 'Market already resolved');
+
+            market.is_resolved = true;
+            market.is_open = false;
+            market.winning_choice = Option::Some(winning_choice);
+
+            let winning_choice_outcome: Outcome = self
+                .choice_num_to_outcome(market_id, winning_choice);
+            market.status = MarketStatus::Resolved(winning_choice_outcome);
+
+            self.all_predictions.entry(market_id).write(market);
+
+            self.emit(MarketResolved { market_id, resolver: get_caller_address(), winning_choice });
+
+            self.end_reentrancy_guard();
+        }
+
+
+        fn force_close_market(ref self: ContractState, market_id: u256, reason: ByteArray) {
+            self.assert_only_admin();
+            self.assert_market_exists(market_id);
+
+            self.start_reentrancy_guard();
+
+            let mut market = self.all_predictions.entry(market_id).read();
+
+            assert(market.is_open, 'Market already closed');
+            assert(!market.is_resolved, 'Market already resolved');
+
+            market.is_open = false;
+            market.status = MarketStatus::Locked;
+
+            self.all_predictions.entry(market_id).write(market);
+
+            self.emit(EmergencyPaused { paused_by: get_caller_address(), reason });
+
+            self.end_reentrancy_guard();
+        }
 
 
         fn emergency_close_multiple_markets(
