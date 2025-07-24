@@ -4,7 +4,7 @@ use pragma_lib::abi::{IPragmaABIDispatcher, IPragmaABIDispatcherTrait};
 use pragma_lib::types::DataType;
 use stakcast::admin_interface::IAdditionalAdmin;
 use stakcast::events::{
-    BetPlaced, EmergencyPaused, Event, FeesCollected, MarketCreated, MarketResolved, ModeratorAdded,
+    BetPlaced, EmergencyPaused, Event, FeesCollected, MarketClosed, MarketCreated, MarketResolved, ModeratorAdded,
     ModeratorRemoved, WagerPlaced, WinningsCollected,
 };
 use stakcast::interface::IPredictionHub;
@@ -1270,7 +1270,20 @@ pub mod PredictionHub {
         }
 
 
-        fn emergency_close_market(ref self: ContractState, market_id: u256, market_type: u8) {}
+        fn emergency_close_market(ref self: ContractState, market_id: u256, market_type: u8) {
+            self.assert_only_admin();
+            self.assert_market_exists(market_id);
+
+            let mut market = self.all_predictions.entry(market_id).read();
+
+            assert(market.is_open, 'Market already closed');
+
+            market.is_open = false;
+
+            self.all_predictions.entry(market_id).write(market);
+
+            self.emit(MarketClosed { market_id, closed_by: get_caller_address() });
+        }
 
 
         fn emergency_close_multiple_markets(

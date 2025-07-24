@@ -28,6 +28,12 @@ pub struct MarketCreated {
 }
 
 #[derive(Drop, starknet::Event)]
+pub struct MarketClosed {
+    pub market_id: u256,
+    pub closed_by: ContractAddress,
+}
+
+#[derive(Drop, starknet::Event)]
 pub struct MarketResolved {
     pub market_id: u256,
     pub resolver: ContractAddress,
@@ -76,6 +82,7 @@ pub enum Event {
     ModeratorRemoved: ModeratorRemoved,
     EmergencyPaused: EmergencyPaused,
     MarketCreated: MarketCreated,
+    MarketClosed: MarketClosed,
     MarketResolved: MarketResolved,
     WagerPlaced: WagerPlaced,
     FeesCollected: FeesCollected,

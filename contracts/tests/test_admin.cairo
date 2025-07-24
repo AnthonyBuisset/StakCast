@@ -301,3 +301,92 @@ fn test_emergency_resolve_multiple_markets_empty_arrays_success() {
     stop_cheat_caller_address(contract.contract_address);
 }
 
+// ================ Emergency Close Market Tests ================
+
+#[test]
+#[should_panic(expected: 'Only admin allowed')]
+fn test_non_admin_emergency_close_market_should_panic() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    let market_id = default_create_predictions(contract);
+    stop_cheat_caller_address(contract.contract_address);
+    
+    start_cheat_caller_address(contract.contract_address, USER1_ADDR());
+    admin_interface.emergency_close_market(market_id, 0);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Market does not exist')]
+fn test_emergency_close_market_market_does_not_exist_should_panic() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    admin_interface.emergency_close_market(999, 0);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Market already closed')]
+fn test_emergency_close_market_already_closed_should_panic() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    let market_id = default_create_predictions(contract);
+    
+    // Close the market first
+    admin_interface.emergency_close_market(market_id, 0);
+    
+    // Try to close it again - should panic
+    admin_interface.emergency_close_market(market_id, 0);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+fn test_emergency_close_market_success() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+
+    let mut spy = spy_events();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    let market_id = default_create_predictions(contract);
+    
+    // Close the market
+    admin_interface.emergency_close_market(market_id, 0);
+    stop_cheat_caller_address(contract.contract_address);
+    
+    // Verify market is now closed
+    let market_after = contract.get_prediction(market_id);
+    assert!(!market_after.is_open, "Market should be closed after emergency close");
+    
+    // Verify event was emitted
+    let (emitter, event) = spy.get_events().events.into_iter().last().unwrap();
+    assert!(emitter == contract.contract_address, "emitter not contract");
+    assert!((*event.data.at(0)).into() == market_id, "market id not correct");
+    assert!(*event.data.at(1) == 0, "admin not closer");
+    assert!(*event.data.at(2) == ADMIN_ADDR().into(), "admin not closer");
+}
+
+#[test]
+fn test_emergency_close_market_preserves_other_properties() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    let market_id = default_create_predictions(contract);
+    
+    // Get market properties before closing
+    let market_before = contract.get_prediction(market_id);
+    let title_before = market_before.title.clone();
+    let description_before = market_before.description.clone();
+    let end_time_before = market_before.end_time;
+    let is_resolved_before = market_before.is_resolved;
+    
+    // Close the market
+    admin_interface.emergency_close_market(market_id, 0);
+    
+    // Verify other properties remain unchanged
+    let market_after = contract.get_prediction(market_id);
+    assert!(market_after.title == title_before, "Title should not change");
+    assert!(market_after.description == description_before, "Description should not change");
+    assert!(market_after.end_time == end_time_before, "End time should not change");
+    assert!(market_after.is_resolved == is_resolved_before, "Resolved status should not change");
+    assert!(!market_after.is_open, "Market should be closed");
+    
+    stop_cheat_caller_address(contract.contract_address);
+}
