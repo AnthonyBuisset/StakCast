@@ -1,4 +1,5 @@
 use core::num::traits::Zero;
+use core::panic_with_felt252;
 use openzeppelin::token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 use pragma_lib::abi::{IPragmaABIDispatcher, IPragmaABIDispatcherTrait};
 use pragma_lib::types::DataType;
@@ -12,7 +13,6 @@ use stakcast::interface::IPredictionHub;
 use stakcast::types::{BetActivity, Choice, MarketStatus, Outcome, PredictionMarket, UserStake};
 use starknet::storage::{Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess};
 use starknet::{ClassHash, ContractAddress, get_block_timestamp, get_caller_address};
-
 
 // ================ Contract Storage ================
 
@@ -220,13 +220,6 @@ pub mod PredictionHub {
             let market = self.all_predictions.entry(market_id).read();
 
             assert(market.market_id == market_id, Errors::MARKET_NOT_EXIST);
-        }
-
-
-        /// @notice Asserts that the provided choice is valid (1 or 2)
-
-        fn assert_valid_choice(self: @ContractState, choice: u8) {
-            assert(choice < 2, Errors::INVALID_CHOICE_SELECTED);
         }
 
 
@@ -505,8 +498,6 @@ pub mod PredictionHub {
 
             self.assert_resolution_not_paused();
 
-            self.assert_valid_choice(choice);
-
             self.assert_valid_amount(amount);
 
             self.assert_sufficient_token_balance_for_token(caller, amount, token_contract_address);
@@ -570,7 +561,6 @@ pub mod PredictionHub {
 
                     market_stats.amount_staked_option_b += amount;
                 },
-                _ => panic!("Invalid choice selected"),
             }
 
             user_stake.total_invested = user_stake.total_invested + amount;
@@ -955,8 +945,6 @@ pub mod PredictionHub {
             self.assert_only_moderator_or_admin();
 
             self.assert_market_exists(market_id);
-
-            self.assert_valid_choice(winning_choice);
 
             self.start_reentrancy_guard();
 
@@ -1418,14 +1406,12 @@ pub mod PredictionHub {
         fn choice_num_to_outcome(self: @ContractState, market_id: u256, choice: u8) -> Outcome {
             let market = self.all_predictions.entry(market_id).read();
 
-            assert(choice <= 1, Errors::INVALID_CHOICE);
-
             let (outcome1, outcome2) = market.choices;
 
             match choice {
                 0 => outcome1,
                 1 => outcome2,
-                _ => panic!("invalid choice"),
+                _ => panic_with_felt252(Errors::INVALID_CHOICE),
             }
         }
 

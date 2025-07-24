@@ -31,8 +31,7 @@ pub mod Errors {
     pub const RESOLUTION_WINDOW_EXPIRED: felt252 = 'Resolution window expired';
 
     // Choice validation errors
-    pub const INVALID_CHOICE_SELECTED: felt252 = 'Invalid choice selected';
-    pub const INVALID_CHOICE: felt252 = 'Invalid Choice';
+    pub const INVALID_CHOICE: felt252 = 'Invalid choice';
 
     // Amount validation errors
     pub const AMOUNT_POSITIVE: felt252 = 'Amount must be positive';
