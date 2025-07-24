@@ -81,3 +81,71 @@ fn test_non_admin_add_moderator_should_panic() {
     contract.add_moderator(MODERATOR_ADDR());
     stop_cheat_caller_address(contract.contract_address);
 }
+
+
+#[test]
+#[should_panic(expected: 'Only admin allowed')]
+fn test_non_admin_emergency_resolve_market_should_panic() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, USER1_ADDR());
+    admin_interface.emergency_resolve_market(0, 0, 0);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Market does not exist')]
+fn test_emergency_resolve_market_market_does_not_exist_should_panic() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    admin_interface.emergency_resolve_market(999, 0, 0);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Market already resolved')]
+fn test_emergency_resolve_market_market_already_resolved_should_panic() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    let market_id = default_create_predictions(contract);
+    // Fast forward time to after market end
+    start_cheat_block_timestamp(
+        contract.contract_address, get_block_timestamp() + 86400 + 3600,
+    ); // 1 day + 1 hour
+    
+    contract.resolve_prediction(market_id, 0);
+   
+    admin_interface.emergency_resolve_market(market_id, 0, 0);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+#[should_panic(expected: 'Invalid choice selected')]
+fn test_emergency_resolve_market_invalid_choice_should_panic() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    let market_id = default_create_predictions(contract);
+    admin_interface.emergency_resolve_market(market_id, 0, 3);
+    stop_cheat_caller_address(contract.contract_address);
+}
+
+#[test]
+fn test_emergency_resolve_market_success() {
+    let (contract, admin_interface, _token) = setup_test_environment();
+
+    let mut spy = spy_events();
+    start_cheat_caller_address(contract.contract_address, ADMIN_ADDR());
+    let market_id = default_create_predictions(contract);
+    admin_interface.emergency_resolve_market(market_id, 0, 0);
+    stop_cheat_caller_address(contract.contract_address);
+
+    let (emitter, event) = spy.get_events().events.into_iter().last().unwrap();
+    
+    assert!(emitter == contract.contract_address, "emitter not contract");
+    assert!((*event.data.at(0)).into() == market_id, "market not resolved");
+    assert!(*event.data.at(1) == 0, "admin not resolver");
+    assert!(*event.data.at(2) == ADMIN_ADDR().into(), "admin not resolver");
+    assert!(*event.data.at(3) == 0, "winning choice not 0");
+
+    stop_cheat_caller_address(contract.contract_address);
+}
+

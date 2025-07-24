@@ -953,15 +953,9 @@ pub mod PredictionHub {
 
             self.assert_only_moderator_or_admin();
 
-            self.assert_market_exists(market_id);
-
-            self.assert_valid_choice(winning_choice);
-
             self.start_reentrancy_guard();
 
             let mut market = self.all_predictions.entry(market_id).read();
-
-            assert(!market.is_resolved, 'Market already resolved');
 
             let current_time = get_block_timestamp();
 
@@ -971,20 +965,7 @@ pub mod PredictionHub {
 
             assert(current_time <= resolution_deadline, 'Resolution window expired');
 
-            market.is_resolved = true;
-
-            market.is_open = false;
-
-            let winning_choice_outcome: Outcome = self
-                .choice_num_to_outcome(market_id, winning_choice);
-
-            market.winning_choice = Option::Some(winning_choice);
-
-            market.status = MarketStatus::Resolved(winning_choice_outcome);
-
-            self.all_predictions.entry(market_id).write(market);
-
-            self.emit(MarketResolved { market_id, resolver: get_caller_address(), winning_choice });
+            self.do_resolve_prediction(market_id, winning_choice);
 
             self.end_reentrancy_guard();
         }
@@ -1312,6 +1293,17 @@ pub mod PredictionHub {
             };
         }
 
+        fn emergency_resolve_market(
+            ref self: ContractState,
+            market_id: u256,
+            market_type: u8,
+            winning_choice: u8,
+        ) {
+            self.assert_only_admin();
+
+            self.do_resolve_prediction(market_id, winning_choice);
+        }
+
 
         fn emergency_resolve_multiple_markets(
             ref self: ContractState,
@@ -1483,6 +1475,27 @@ pub mod PredictionHub {
             let user_reward = (user_shares * distributable_pool) / total_winning_shares;
 
             user_reward
+        }
+
+        fn do_resolve_prediction(ref self: ContractState, market_id: u256, winning_choice: u8) {
+            self.assert_market_exists(market_id);
+            self.assert_valid_choice(winning_choice);
+
+            let mut market = self.all_predictions.entry(market_id).read();
+            assert(!market.is_resolved, 'Market already resolved');
+
+            market.is_resolved = true;
+            market.is_open = false;
+
+            let winning_choice_outcome: Outcome = self
+                .choice_num_to_outcome(market_id, winning_choice);
+
+            market.winning_choice = Option::Some(winning_choice);
+            market.status = MarketStatus::Resolved(winning_choice_outcome);
+
+            self.all_predictions.entry(market_id).write(market);
+
+            self.emit(MarketResolved { market_id, resolver: get_caller_address(), winning_choice });
         }
     }
 }

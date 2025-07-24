@@ -108,7 +108,7 @@ pub fn setup_test_environment() -> (
     (prediction_hub, admin_interface, token)
 }
 
-pub fn default_create_predictions(prediction_hub: IPredictionHubDispatcher) {
+pub fn default_create_predictions(prediction_hub: IPredictionHubDispatcher) -> u256 {
     let title: ByteArray = "Will Donald Trump Be President";
     let description: ByteArray = "This is a pool to check if donald trump will be president";
     let choices: (felt252, felt252) = ('Yes', 'No');
@@ -149,6 +149,8 @@ pub fn default_create_predictions(prediction_hub: IPredictionHubDispatcher) {
     assert(market.is_open, 'Market should be open');
     assert(!market.is_resolved, 'Market not resolved');
     assert(market.total_pool == PRECISION(), 'Initial pool 0');
+
+    market_id
 }
 
 // Default create for a crypto prediction market
