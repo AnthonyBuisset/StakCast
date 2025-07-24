@@ -108,7 +108,7 @@ pub fn setup_test_environment() -> (
     (prediction_hub, admin_interface, token)
 }
 
-pub fn default_create_predictions(prediction_hub: IPredictionHubDispatcher) {
+pub fn default_create_predictions(prediction_hub: IPredictionHubDispatcher) -> u256 {
     let title: ByteArray = "Will Donald Trump Be President";
     let description: ByteArray = "This is a pool to check if donald trump will be president";
     let choices: (felt252, felt252) = ('Yes', 'No');
@@ -118,6 +118,8 @@ pub fn default_create_predictions(prediction_hub: IPredictionHubDispatcher) {
     let crypto_prediction: Option<(felt252, u128)> = Option::None;
 
     let mut spy = spy_events();
+
+    let prediction_count_before = prediction_hub.get_all_predictions_by_market_category(0).len();
 
     prediction_hub
         .create_predictions(
@@ -140,8 +142,8 @@ pub fn default_create_predictions(prediction_hub: IPredictionHubDispatcher) {
         Option::None => panic!("No MarketCreated event emitted"),
     };
 
-    let all_normal_predictions = prediction_hub.get_all_predictions_by_market_category(0);
-    assert(all_normal_predictions.len() == 1, 'should be increased by 1');
+    let prediction_count_after = prediction_hub.get_all_predictions_by_market_category(0).len();
+    assert(prediction_count_after == prediction_count_before + 1, 'should be increased by 1');
 
     let market = prediction_hub.get_prediction(market_id);
     assert(market.market_id == market_id, 'Market ID mismatch');
@@ -149,6 +151,8 @@ pub fn default_create_predictions(prediction_hub: IPredictionHubDispatcher) {
     assert(market.is_open, 'Market should be open');
     assert(!market.is_resolved, 'Market not resolved');
     assert(market.total_pool == PRECISION(), 'Initial pool 0');
+
+    market_id
 }
 
 // Default create for a crypto prediction market

@@ -4,7 +4,7 @@ use pragma_lib::abi::{IPragmaABIDispatcher, IPragmaABIDispatcherTrait};
 use pragma_lib::types::DataType;
 use stakcast::admin_interface::IAdditionalAdmin;
 use stakcast::events::{
-    BetPlaced, EmergencyPaused, Event, FeesCollected, MarketCreated, MarketResolved, ModeratorAdded,
+    BetPlaced, EmergencyPaused, Event, FeesCollected, MarketClosed, MarketCreated, MarketResolved, ModeratorAdded,
     ModeratorRemoved, WagerPlaced, WinningsCollected,
 };
 use stakcast::interface::IPredictionHub;
@@ -953,15 +953,9 @@ pub mod PredictionHub {
 
             self.assert_only_moderator_or_admin();
 
-            self.assert_market_exists(market_id);
-
-            self.assert_valid_choice(winning_choice);
-
             self.start_reentrancy_guard();
 
             let mut market = self.all_predictions.entry(market_id).read();
-
-            assert(!market.is_resolved, 'Market already resolved');
 
             let current_time = get_block_timestamp();
 
@@ -971,20 +965,7 @@ pub mod PredictionHub {
 
             assert(current_time <= resolution_deadline, 'Resolution window expired');
 
-            market.is_resolved = true;
-
-            market.is_open = false;
-
-            let winning_choice_outcome: Outcome = self
-                .choice_num_to_outcome(market_id, winning_choice);
-
-            market.winning_choice = Option::Some(winning_choice);
-
-            market.status = MarketStatus::Resolved(winning_choice_outcome);
-
-            self.all_predictions.entry(market_id).write(market);
-
-            self.emit(MarketResolved { market_id, resolver: get_caller_address(), winning_choice });
+            self.do_resolve_prediction(market_id, winning_choice);
 
             self.end_reentrancy_guard();
         }
@@ -1289,7 +1270,20 @@ pub mod PredictionHub {
         }
 
 
-        fn emergency_close_market(ref self: ContractState, market_id: u256, market_type: u8) {}
+        fn emergency_close_market(ref self: ContractState, market_id: u256, market_type: u8) {
+            self.assert_only_admin();
+            self.assert_market_exists(market_id);
+
+            let mut market = self.all_predictions.entry(market_id).read();
+
+            assert(market.is_open, 'Market already closed');
+
+            market.is_open = false;
+
+            self.all_predictions.entry(market_id).write(market);
+
+            self.emit(MarketClosed { market_id, closed_by: get_caller_address() });
+        }
 
 
         fn emergency_close_multiple_markets(
@@ -1312,13 +1306,41 @@ pub mod PredictionHub {
             };
         }
 
+        fn emergency_resolve_market(
+            ref self: ContractState,
+            market_id: u256,
+            market_type: u8,
+            winning_choice: u8,
+        ) {
+            self.assert_only_admin();
+
+            self.do_resolve_prediction(market_id, winning_choice);
+        }
+
 
         fn emergency_resolve_multiple_markets(
             ref self: ContractState,
             market_ids: Array<u256>,
             market_types: Array<u8>,
             winning_choices: Array<u8>,
-        ) {}
+        ) {
+            self.assert_only_admin();
+
+            assert(market_ids.len() == market_types.len(), 'Arrays length mismatch');
+            assert(market_ids.len() == winning_choices.len(), 'Arrays length mismatch');
+
+            let mut i = 0;
+
+            while i != market_ids.len() {
+                let market_id = *market_ids.at(i);
+                let market_type = *market_types.at(i);
+                let winning_choice = *winning_choices.at(i);
+
+                self.emergency_resolve_market(market_id, market_type, winning_choice);
+
+                i += 1;
+            };
+        }
 
 
         fn set_protocol_token(ref self: ContractState, token_address: ContractAddress) {
@@ -1483,6 +1505,27 @@ pub mod PredictionHub {
             let user_reward = (user_shares * distributable_pool) / total_winning_shares;
 
             user_reward
+        }
+
+        fn do_resolve_prediction(ref self: ContractState, market_id: u256, winning_choice: u8) {
+            self.assert_market_exists(market_id);
+            self.assert_valid_choice(winning_choice);
+
+            let mut market = self.all_predictions.entry(market_id).read();
+            assert(!market.is_resolved, 'Market already resolved');
+
+            market.is_resolved = true;
+            market.is_open = false;
+
+            let winning_choice_outcome: Outcome = self
+                .choice_num_to_outcome(market_id, winning_choice);
+
+            market.winning_choice = Option::Some(winning_choice);
+            market.status = MarketStatus::Resolved(winning_choice_outcome);
+
+            self.all_predictions.entry(market_id).write(market);
+
+            self.emit(MarketResolved { market_id, resolver: get_caller_address(), winning_choice });
         }
     }
 }
